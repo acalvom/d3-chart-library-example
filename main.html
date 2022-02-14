@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>3d- Chart Library</title>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+	</head>
+
+	<body>
+		<div class="container"></div>
+		<script src="https://d3js.org/d3.v6.min.js"></script>
+		<style>
+			.rectangles {
+				fill: rgba(214, 217, 219, 0.384);
+				stroke: #1867b7;
+				cursor: pointer;
+			}
+
+			.connectors {
+				fill: none;
+				stroke: #1867b7;
+				stroke-width: 1.5px;
+			}
+
+			.labels {
+				font-family: "Roboto", sans-serif;
+				font-weight: normal;
+				font-size: 14px;
+			}
+		</style>
+		<script>
+			fetch("data.json")
+				.then((response) => response.json())
+				.then((data) => {
+					data.forEach((item) => {
+						item.name = item.text;
+					});
+					var dataStructure = {
+						name: "DATA",
+						children: data,
+					};
+
+					var margin = { top: 20, right: 90, bottom: 20, left: 90 };
+					var width = 960 - margin.left - margin.right;
+					var height = 500 - margin.top - margin.bottom;
+					var inc = 150;
+
+					var svg = d3
+						.select(".container")
+						.append("svg")
+						.attr("width", width + margin.right + margin.left)
+						.attr("height", height + margin.top + margin.bottom)
+						.append("g")
+						.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+					var treeStructure = d3.tree().size([height, width]);
+					var root = d3.hierarchy(dataStructure, (d) => d.children);
+						
+					var treeData = treeStructure(root);
+					var nodes = treeData.descendants();
+						nodes.forEach((d) => (d.y = d.depth * 300)); // Acercar y alejar los nodos hijos del root
+					var links = treeData.links();
+
+					var labels = svg.append("g").selectAll("text").data(nodes);
+					labels
+						.enter()
+						.append("text")
+						.attr("class", "labels")
+						.text((d) => d.data.name)
+						.attr("text-anchor", (d) => (d.children || d._children ? "end" : "start"));
+
+					var rootLabel = document.getElementsByClassName("labels")[0].getBoundingClientRect();
+					var childLabel = document.getElementsByClassName("labels")[1].getBoundingClientRect();
+
+					var rectangles = svg
+						.append("g") // Grupo para añadir los nodos (circulos)
+						.selectAll("rect") // Seleccionar todos los circulos a añadir
+						.data(nodes); // Datos a insertar, los nodos. Lo anterior se realiza para cada dato
+
+					var rectHeight = 40,
+						rectPadding = 20,
+						rootRectWidth = rootLabel.width + rectPadding,
+						childRectWidth = childLabel.width + rectPadding;
+
+					rectangles
+						.enter() // Crear los circulos en el DOM
+						.append("rect")
+						.attr("class", "rectangles")
+						.attr("x", (d) => (d.children ? d.y + inc - rootRectWidth : d.y + inc))
+						.attr("y", (d) => d.x - rectHeight / 2)
+						.attr("rx", 5) // Redondear las esquinas de los bordes
+						.attr("ry", 5)
+						.attr("height", rectHeight)
+						.attr("width", (d) => (d.children ? rootRectWidth : childRectWidth))
+						.on("click", click);
+
+					d3.selectAll(".labels")
+						.attr("x", (d) => (d.children ? d.y + inc - rectPadding / 2 : d.y + inc + rectPadding / 2)) // La posición centrada de la etiqueta en el eje x
+						.attr("y", (d) => d.x + rootLabel.height / 2 / 2); // La posición centrada del la etiqueta en el eje y
+
+					var connectors = svg
+						.append("g") // Generar un grupo aparte para los links. Puede no ser necesario
+						.selectAll("path") // Se van a usar elementos path
+						.data(links); // Y los datos que se van a añadir son los links anteriores
+
+					var connectorUpdate = connectors
+						.enter()
+						.append("path")
+						.attr("class", "connectors")
+						.attr("d", (d) => getPath(d));
+
+					// Funcion para definir los puntos del path
+					//    M yOrigen xOrigen                        --> Starting point
+					//    C yIntermedioOrigen xIntermedioOrigen    --> Intermediate Point 1
+					//      yIntermedioDestino xIntermedioDestino  --> Intermediate Point 2
+					//      yDestino xDestino					   --> Ending point
+					function getPath(d) {
+						// prettier-ignore
+						return (
+							"M" + (inc + d.source.y) + "," + d.source.x +
+							" C " + (inc + (d.source.y + d.target.y) / 2) + "," + d.source.x +
+								" " +(inc + (d.source.y + d.target.y) / 2) + "," + d.target.x + 
+								" " +(inc + d.target.y) + "," + d.target.x	
+						);
+					}
+
+					function click(event, d) {
+						 d.children
+						 	? window.location.reload()
+						 	: window.open("http://127.0.0.1:5500/dataDetail.html?id=" + d.data.id, "_blank").focus();
+					}
+				});
+		</script>
+	</body>
+</html>
